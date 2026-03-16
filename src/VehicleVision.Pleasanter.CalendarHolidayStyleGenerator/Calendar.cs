@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace VehicleVision.PleasanterTools.HolidayStyleGenerator
+namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
 {
     public class Calendar
     {
