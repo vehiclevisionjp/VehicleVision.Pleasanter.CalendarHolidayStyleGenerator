@@ -184,3 +184,9 @@ yarn-error.log*
 
 # PDF出力
 pdf-output/
+
+# NLog内部ログ
+internal-nlog.txt
+
+# npm lock file
+package-lock.json
