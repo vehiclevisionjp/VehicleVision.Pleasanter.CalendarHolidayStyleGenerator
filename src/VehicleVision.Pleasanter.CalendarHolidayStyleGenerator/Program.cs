@@ -309,7 +309,7 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
             //祝日
             foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
             {
-                //存在するファイルが過去のものである場合はスキップ
+                //過去の年のデータである場合はスキップ
                 if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
                 {
                     continue;
@@ -361,7 +361,7 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
             //祝日
             foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
             {
-                //存在するファイルが過去のものである場合はスキップ
+                //過去の年のデータである場合はスキップ
                 if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
                 {
                     continue;
