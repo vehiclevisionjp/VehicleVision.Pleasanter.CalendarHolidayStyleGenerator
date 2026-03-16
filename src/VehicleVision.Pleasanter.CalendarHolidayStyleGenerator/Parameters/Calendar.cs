@@ -14,5 +14,7 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator.Parameters
         public string SaturdayBackgroundColor { get; set; } = "#add8e6";
         public string SundayBackgroundColor { get; set; } = "#ffc0cb";
         public string HolidayBackgroundColor { get; set; } = "#ffc0cb";
+        public string ApiUrl { get; set; } = "";
+        public string ApiKey { get; set; } = "";
     }
 }
