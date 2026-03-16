@@ -9,9 +9,6 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
-    <!-- Nullable参照型 -->
-    <Nullable>enable</Nullable>
-
     <!-- 警告をエラーとして扱う（リリースビルド時） -->
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
 

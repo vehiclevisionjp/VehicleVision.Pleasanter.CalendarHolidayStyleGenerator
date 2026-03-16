@@ -60,7 +60,7 @@ VehicleVision.Pleasanter.CalendarHolidayStyleGenerator/
 
 | ライブラリ              | ライセンス    | 著作権                                            |
 | ----------------------- | ------------- | ------------------------------------------------- |
-| CsvHelper               | MS-PL / Apache-2.0 | Copyright (c) Josh Close                   |
+| CsvHelper               | MS-PL OR Apache-2.0 | Copyright (c) Josh Close                  |
 | Newtonsoft.Json          | MIT           | Copyright (c) James Newton-King                   |
 | NLog                     | BSD-3-Clause  | Copyright (c) Jaroslaw Kowalski, Kim Christensen  |
 | NLog.Extensions.Logging  | BSD-2-Clause  | Copyright (c) NLog                                |
