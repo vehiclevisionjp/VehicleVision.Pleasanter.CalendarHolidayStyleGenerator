@@ -21,17 +21,26 @@ git clone https://github.com/your-username/VehicleVision.Pleasanter.CalendarHoli
 cd VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
 ```
 
-### 2. ブランチを作成
+### 2. サブモジュールの初期化
+
+本プロジェクトは [Implem.Pleasanter](https://github.com/Implem/Implem.Pleasanter) を
+サブモジュールとして参照しています。クローン後にサブモジュールを初期化してください。
+
+```bash
+git submodule update --init --recursive
+```
+
+### 3. ブランチを作成
 
 ```bash
 git checkout -b feature/your-feature-name
 ```
 
-### 3. 変更を実装
+### 4. 変更を実装
 
 変更を実装してください。
 
-### 4. コミット・プッシュ
+### 5. コミット・プッシュ
 
 ```bash
 git add .
@@ -39,7 +48,7 @@ git commit -m "feat: 変更の概要"
 git push origin feature/your-feature-name
 ```
 
-### 5. プルリクエストを作成
+### 6. プルリクエストを作成
 
 GitHub上でプルリクエストを作成してください。
 

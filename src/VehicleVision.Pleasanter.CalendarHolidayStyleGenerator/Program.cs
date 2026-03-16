@@ -55,13 +55,7 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
                 }
 
                 //ベースパスから出力先のパスを取得する
-                var outputPath = Path.Combine(exStylePath, "CalendarStyle");
-
-                //出力先が存在しない時は作る
-                if (!Path.Exists(outputPath))
-                {
-                    Directory.CreateDirectory(outputPath);
-                }
+                var calendarStylePath = Path.Combine(exStylePath, "CalendarStyle");
 
                 //パラメータ読み取り
                 //ジェネレータのカレンダー設定
@@ -82,70 +76,171 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
                     using (var reader = new StreamReader(stream, Encoding.GetEncoding("Shift_JIS")))
                     using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
                     {
-                        var records = csv.GetRecords<Calendar>();
+                        var records = csv.GetRecords<Calendar>().ToList();
 
-                        //祝日
-                        foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
-                        {
-                            var outputFile = Path.Combine(outputPath, $"CalendarStyle-Holiday{recordsYear.Key}.css");
+                        //標準カレンダー用CSS生成
+                        GenerateStandardCalendarCss(
+                            records, calendarStylePath, paramCalendar, allRefresh);
 
-                            //既に出力済みのファイルがある場合は削除する
-                            if (File.Exists(outputFile))
-                            {
-                                //存在するファイルが過去のものである場合は更新
-                                if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
-                                {
-                                    continue;
-                                }
-
-                                File.Delete(outputFile);
-                                logger.Info($"{Path.GetFileName(outputFile)} Deleted.");
-                            }
-
-                            if (recordsYear.Any())
-                            {
-                                foreach (var record in recordsYear)
-                                {
-                                    File.AppendAllText(
-                                        outputFile,
-                                        @$"#CalendarBody #Grid tbody tr td[data-id=""{record.Date:yyyy/M/d}""]:not(.other-month){{background-color:{paramCalendar.HolidayBackgroundColor} !important;}}"
-                                        + Environment.NewLine
-                                        + $@"#CalendarBody #Grid tbody tr td[data-id=""{record.Date:yyyy/M/d}""] div .day:after{{content:""{record.Title}"";margin-left:5px;}}"
-                                        + Environment.NewLine
-                                    );
-                                }
-
-                                logger.Info($"{Path.GetFileName(outputFile)} Created.");
-                            }
-                        }
-
-                        //週末
-                        {
-                            var outputFile = Path.Combine(outputPath, $"CalendarStyle-Weekend.css");
-
-                            //既に出力済みのファイルがある場合は削除する
-                            if (File.Exists(outputFile))
-                            {
-                                File.Delete(outputFile);
-                                logger.Info($"{Path.GetFileName(outputFile)} Deleted.");
-                            }
-
-                            File.AppendAllText(
-                            outputFile,
-                                @$"#CalendarBody #Grid tbody tr td:nth-child({paramCalendar.SaturdayIndex}):not(.other-month){{background-color:{paramCalendar.SaturdayBackgroundColor};}}"
-                                + Environment.NewLine
-                                + @$"#CalendarBody #Grid tbody tr td:nth-child({paramCalendar.SundayIndex}):not(.other-month){{background-color:{paramCalendar.SundayBackgroundColor};}}"
-                                + Environment.NewLine
-                            );
-
-                            logger.Info($"{Path.GetFileName(outputFile)} Created.");
-                        }
+                        //FullCalendar用CSS生成
+                        GenerateFullCalendarCss(
+                            records, calendarStylePath, paramCalendar, allRefresh);
                     }
                 }
             }
             catch (Exception ex)
             {
                 logger.Error(ex);
+            }
+        }
+
+        /// <summary>
+        /// 標準カレンダー用のCSSファイルを生成する
+        /// </summary>
+        private static void GenerateStandardCalendarCss(
+            List<Calendar> records,
+            string calendarStylePath,
+            Parameters.Calendar paramCalendar,
+            bool allRefresh)
+        {
+            var outputPath = Path.Combine(calendarStylePath, "Standard");
+
+            //出力先が存在しない時は作る
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+
+            //祝日
+            foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
+            {
+                var outputFile = Path.Combine(outputPath, $"CalendarStyle-Holiday{recordsYear.Key}.css");
+
+                //既に出力済みのファイルがある場合は削除する
+                if (File.Exists(outputFile))
+                {
+                    //存在するファイルが過去のものである場合は更新
+                    if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
+                    {
+                        continue;
+                    }
+
+                    File.Delete(outputFile);
+                    logger.Info($"{Path.GetFileName(outputFile)} Deleted.");
+                }
+
+                if (recordsYear.Any())
+                {
+                    foreach (var record in recordsYear)
+                    {
+                        File.AppendAllText(
+                            outputFile,
+                            @$"#CalendarBody #Grid tbody tr td[data-id=""{record.Date:yyyy/M/d}""]:not(.other-month){{background-color:{paramCalendar.HolidayBackgroundColor} !important;}}"
+                            + Environment.NewLine
+                            + $@"#CalendarBody #Grid tbody tr td[data-id=""{record.Date:yyyy/M/d}""] div .day:after{{content:""{record.Title}"";margin-left:5px;}}"
+                            + Environment.NewLine
+                        );
+                    }
+
+                    logger.Info($"Standard/{Path.GetFileName(outputFile)} Created.");
+                }
+            }
+
+            //週末
+            {
+                var outputFile = Path.Combine(outputPath, $"CalendarStyle-Weekend.css");
+
+                //既に出力済みのファイルがある場合は削除する
+                if (File.Exists(outputFile))
+                {
+                    File.Delete(outputFile);
+                    logger.Info($"{Path.GetFileName(outputFile)} Deleted.");
+                }
+
+                File.AppendAllText(
+                outputFile,
+                    @$"#CalendarBody #Grid tbody tr td:nth-child({paramCalendar.SaturdayIndex}):not(.other-month){{background-color:{paramCalendar.SaturdayBackgroundColor};}}"
+                    + Environment.NewLine
+                    + @$"#CalendarBody #Grid tbody tr td:nth-child({paramCalendar.SundayIndex}):not(.other-month){{background-color:{paramCalendar.SundayBackgroundColor};}}"
+                    + Environment.NewLine
+                );
+
+                logger.Info($"Standard/{Path.GetFileName(outputFile)} Created.");
+            }
+        }
+
+        /// <summary>
+        /// FullCalendar用のCSSファイルを生成する
+        /// </summary>
+        private static void GenerateFullCalendarCss(
+            List<Calendar> records,
+            string calendarStylePath,
+            Parameters.Calendar paramCalendar,
+            bool allRefresh)
+        {
+            var outputPath = Path.Combine(calendarStylePath, "FullCalendar");
+
+            //出力先が存在しない時は作る
+            if (!Directory.Exists(outputPath))
+            {
+                Directory.CreateDirectory(outputPath);
+            }
+
+            //祝日
+            foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
+            {
+                var outputFile = Path.Combine(outputPath, $"CalendarStyle-Holiday{recordsYear.Key}.css");
+
+                //既に出力済みのファイルがある場合は削除する
+                if (File.Exists(outputFile))
+                {
+                    //存在するファイルが過去のものである場合は更新
+                    if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
+                    {
+                        continue;
+                    }
+
+                    File.Delete(outputFile);
+                    logger.Info($"{Path.GetFileName(outputFile)} Deleted.");
+                }
+
+                if (recordsYear.Any())
+                {
+                    foreach (var record in recordsYear)
+                    {
+                        File.AppendAllText(
+                            outputFile,
+                            @$"#FullCalendar .fc td.fc-daygrid-day[data-date=""{record.Date:yyyy-MM-dd}""]:not(.fc-day-other){{background-color:{paramCalendar.HolidayBackgroundColor} !important;}}"
+                            + Environment.NewLine
+                            + @$"#FullCalendar .fc td.fc-daygrid-day[data-date=""{record.Date:yyyy-MM-dd}""] .fc-daygrid-day-top:after{{content:""{record.Title}"";margin-left:5px;}}"
+                            + Environment.NewLine
+                        );
+                    }
+
+                    logger.Info($"FullCalendar/{Path.GetFileName(outputFile)} Created.");
+                }
+            }
+
+            //週末
+            {
+                var outputFile = Path.Combine(outputPath, $"CalendarStyle-Weekend.css");
+
+                //既に出力済みのファイルがある場合は削除する
+                if (File.Exists(outputFile))
+                {
+                    File.Delete(outputFile);
+                    logger.Info($"{Path.GetFileName(outputFile)} Deleted.");
+                }
+
+                File.AppendAllText(
+                outputFile,
+                    @$"#FullCalendar .fc td.fc-day-sat:not(.fc-day-other){{background-color:{paramCalendar.SaturdayBackgroundColor};}}"
+                    + Environment.NewLine
+                    + @$"#FullCalendar .fc td.fc-day-sun:not(.fc-day-other){{background-color:{paramCalendar.SundayBackgroundColor};}}"
+                    + Environment.NewLine
+                );
+
+                logger.Info($"FullCalendar/{Path.GetFileName(outputFile)} Created.");
             }
         }
 
