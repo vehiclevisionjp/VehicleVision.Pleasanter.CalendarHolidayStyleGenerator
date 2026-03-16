@@ -5,6 +5,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <Version>0.0.0</Version>
+    <Authors>VehicleVision</Authors>
+    <Description>Pleasanter Calendar Holiday Style Generator</Description>
+    <PackageProjectUrl>https://github.com/vehiclevisionjp/VehicleVision.Pleasanter.CalendarHolidayStyleGenerator</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/vehiclevisionjp/VehicleVision.Pleasanter.CalendarHolidayStyleGenerator</RepositoryUrl>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <PackageTags>Pleasanter;Calendar;Holiday;Style</PackageTags>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>pleasanter-calendar-holiday-style-generator</ToolCommandName>
   </PropertyGroup>
 
   <ItemGroup>
