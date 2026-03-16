@@ -4,5 +4,7 @@
   "SundayIndex": 7,
   "SaturdayBackgroundColor": "#add8e6",
   "SundayBackgroundColor": "#ffc0cb",
-  "HolidayBackgroundColor": "#ffc0cb"
+  "HolidayBackgroundColor": "#ffc0cb",
+  "ApiUrl": "",
+  "ApiKey": ""
 }

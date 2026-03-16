@@ -1,12 +1,8 @@
 ﻿using CsvHelper;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using NLog;
-using System.Drawing;
 using System.Globalization;
 using System.Net;
-using System.Reflection;
-using System.Reflection.Metadata;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -32,34 +28,61 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
                 //全更新するかどうか
                 var allRefresh = argsDic.ContainsKey("a");
 
-                //ペースパスの有無を取得する
-                if (!argsDic.TryGetValue("p", out var rootPath))
+                //出力モードの取得（file または api）
+                if (!argsDic.TryGetValue("m", out var mode))
                 {
-                    rootPath = Path.Combine(currentPath, "..", "Implem.Pleasanter");
+                    mode = "file";
                 }
 
-                //ベースのパスが存在しない時は落とす
-                if (!Directory.Exists(rootPath))
-                {
-                    logger.Fatal("Root path does not exist. Please check the path.");
-                    return;
-                }
-
-                var exStylePath = Path.Combine(rootPath, "App_Data", "Parameters", "ExtendedStyles");
-
-                //拡張スタイルのパスが存在しない時は落とす
-                if (!Directory.Exists(exStylePath))
-                {
-                    logger.Fatal("ExtendedStyles path does not exist. Please check the path.");
-                    return;
-                }
-
-                //ベースパスから出力先のパスを取得する
-                var calendarStylePath = Path.Combine(exStylePath, "CalendarStyle");
+                mode = mode.ToLowerInvariant();
 
                 //パラメータ読み取り
                 //ジェネレータのカレンダー設定
                 var paramCalendar = DeserializeFromFile<Parameters.Calendar>(Path.Combine(currentPath, "Parameters", "Calendar.json"));
+
+                var calendarStylePath = string.Empty;
+
+                if (mode == "api")
+                {
+                    //APIモードの場合、APIのURLとAPIキーが必要
+                    if (string.IsNullOrWhiteSpace(paramCalendar.ApiUrl) || string.IsNullOrWhiteSpace(paramCalendar.ApiKey))
+                    {
+                        logger.Fatal("API mode requires ApiUrl and ApiKey to be set in Parameters/Calendar.json.");
+                        return;
+                    }
+                }
+                else if (mode == "file")
+                {
+                    //ファイルモードの場合、ベースパスの有無を取得する
+                    if (!argsDic.TryGetValue("p", out var rootPath))
+                    {
+                        rootPath = Path.Combine(currentPath, "..", "Implem.Pleasanter");
+                    }
+
+                    //ベースのパスが存在しない時は落とす
+                    if (!Directory.Exists(rootPath))
+                    {
+                        logger.Fatal("Root path does not exist. Please check the path.");
+                        return;
+                    }
+
+                    var exStylePath = Path.Combine(rootPath, "App_Data", "Parameters", "ExtendedStyles");
+
+                    //拡張スタイルのパスが存在しない時は落とす
+                    if (!Directory.Exists(exStylePath))
+                    {
+                        logger.Fatal("ExtendedStyles path does not exist. Please check the path.");
+                        return;
+                    }
+
+                    //ベースパスから出力先のパスを取得する
+                    calendarStylePath = Path.Combine(exStylePath, "CalendarStyle");
+                }
+                else
+                {
+                    logger.Fatal($"Unknown mode: {mode}. Use 'file' or 'api'.");
+                    return;
+                }
 
                 //内閣府のサイトより公示された祝日データを取得する
                 using (var request = new HttpRequestMessage(HttpMethod.Get, new Uri(paramCalendar.CalendarUrl)))
@@ -78,13 +101,23 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
                     {
                         var records = csv.GetRecords<Calendar>().ToList();
 
-                        //標準カレンダー用CSS生成
-                        GenerateStandardCalendarCss(
-                            records, calendarStylePath, paramCalendar, allRefresh);
+                        if (mode == "api")
+                        {
+                            //APIモード：Extensionsテーブルに書き込む
+                            await GenerateCalendarCssViaApiAsync(
+                                records, paramCalendar, allRefresh);
+                        }
+                        else
+                        {
+                            //ファイルモード：CSSファイルを生成する
+                            //標準カレンダー用CSS生成
+                            GenerateStandardCalendarCss(
+                                records, calendarStylePath, paramCalendar, allRefresh);
 
-                        //FullCalendar用CSS生成
-                        GenerateFullCalendarCss(
-                            records, calendarStylePath, paramCalendar, allRefresh);
+                            //FullCalendar用CSS生成
+                            GenerateFullCalendarCss(
+                                records, calendarStylePath, paramCalendar, allRefresh);
+                        }
                     }
                 }
             }
@@ -241,6 +274,272 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
                 );
 
                 logger.Info($"FullCalendar/{Path.GetFileName(outputFile)} Created.");
+            }
+        }
+
+        /// <summary>
+        /// APIを使用してExtensionsテーブルにカレンダースタイルを書き込む
+        /// </summary>
+        private static async Task GenerateCalendarCssViaApiAsync(
+            List<Calendar> records,
+            Parameters.Calendar paramCalendar,
+            bool allRefresh)
+        {
+            //既存のExtensionを取得する
+            var existingExtensions = await GetExtensionsAsync(paramCalendar);
+
+            //標準カレンダー用CSS生成・登録
+            await GenerateStandardCalendarCssViaApiAsync(
+                records, paramCalendar, allRefresh, existingExtensions);
+
+            //FullCalendar用CSS生成・登録
+            await GenerateFullCalendarCssViaApiAsync(
+                records, paramCalendar, allRefresh, existingExtensions);
+        }
+
+        /// <summary>
+        /// 標準カレンダー用のCSSをAPIで登録する
+        /// </summary>
+        private static async Task GenerateStandardCalendarCssViaApiAsync(
+            List<Calendar> records,
+            Parameters.Calendar paramCalendar,
+            bool allRefresh,
+            List<ExtensionData> existingExtensions)
+        {
+            //祝日
+            foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
+            {
+                //過去の年のデータである場合はスキップ
+                if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
+                {
+                    continue;
+                }
+
+                if (recordsYear.Any())
+                {
+                    var extensionName = $"CalendarStyle-Standard-Holiday{recordsYear.Key}";
+                    var sb = new StringBuilder();
+
+                    foreach (var record in recordsYear)
+                    {
+                        sb.Append(
+                            @$"#CalendarBody #Grid tbody tr td[data-id=""{record.Date:yyyy/M/d}""]:not(.other-month){{background-color:{paramCalendar.HolidayBackgroundColor} !important;}}"
+                            + Environment.NewLine
+                            + $@"#CalendarBody #Grid tbody tr td[data-id=""{record.Date:yyyy/M/d}""] div .day:after{{content:""{record.Title}"";margin-left:5px;}}"
+                            + Environment.NewLine
+                        );
+                    }
+
+                    await CreateOrUpdateExtensionAsync(
+                        paramCalendar, extensionName, sb.ToString(), existingExtensions);
+                }
+            }
+
+            //週末
+            {
+                var extensionName = "CalendarStyle-Standard-Weekend";
+                var body =
+                    @$"#CalendarBody #Grid tbody tr td:nth-child({paramCalendar.SaturdayIndex}):not(.other-month){{background-color:{paramCalendar.SaturdayBackgroundColor};}}"
+                    + Environment.NewLine
+                    + @$"#CalendarBody #Grid tbody tr td:nth-child({paramCalendar.SundayIndex}):not(.other-month){{background-color:{paramCalendar.SundayBackgroundColor};}}"
+                    + Environment.NewLine;
+
+                await CreateOrUpdateExtensionAsync(
+                    paramCalendar, extensionName, body, existingExtensions);
+            }
+        }
+
+        /// <summary>
+        /// FullCalendar用のCSSをAPIで登録する
+        /// </summary>
+        private static async Task GenerateFullCalendarCssViaApiAsync(
+            List<Calendar> records,
+            Parameters.Calendar paramCalendar,
+            bool allRefresh,
+            List<ExtensionData> existingExtensions)
+        {
+            //祝日
+            foreach (var recordsYear in records.GroupBy(record => record.Date.Year))
+            {
+                //過去の年のデータである場合はスキップ
+                if (recordsYear.Key < DateTime.Today.Year && !allRefresh)
+                {
+                    continue;
+                }
+
+                if (recordsYear.Any())
+                {
+                    var extensionName = $"CalendarStyle-FullCalendar-Holiday{recordsYear.Key}";
+                    var sb = new StringBuilder();
+
+                    foreach (var record in recordsYear)
+                    {
+                        sb.Append(
+                            @$"#FullCalendar .fc td.fc-daygrid-day[data-date=""{record.Date:yyyy-MM-dd}""]:not(.fc-day-other){{background-color:{paramCalendar.HolidayBackgroundColor} !important;}}"
+                            + Environment.NewLine
+                            + @$"#FullCalendar .fc td.fc-daygrid-day[data-date=""{record.Date:yyyy-MM-dd}""] .fc-daygrid-day-top:after{{content:""{record.Title}"";margin-left:5px;}}"
+                            + Environment.NewLine
+                        );
+                    }
+
+                    await CreateOrUpdateExtensionAsync(
+                        paramCalendar, extensionName, sb.ToString(), existingExtensions);
+                }
+            }
+
+            //週末
+            {
+                var extensionName = "CalendarStyle-FullCalendar-Weekend";
+                var body =
+                    @$"#FullCalendar .fc td.fc-day-sat:not(.fc-day-other){{background-color:{paramCalendar.SaturdayBackgroundColor};}}"
+                    + Environment.NewLine
+                    + @$"#FullCalendar .fc td.fc-day-sun:not(.fc-day-other){{background-color:{paramCalendar.SundayBackgroundColor};}}"
+                    + Environment.NewLine;
+
+                await CreateOrUpdateExtensionAsync(
+                    paramCalendar, extensionName, body, existingExtensions);
+            }
+        }
+
+        /// <summary>
+        /// Extensions APIから既存のExtensionを取得する
+        /// </summary>
+        private static async Task<List<ExtensionData>> GetExtensionsAsync(
+            Parameters.Calendar paramCalendar)
+        {
+            var apiUrl = paramCalendar.ApiUrl.TrimEnd('/');
+            var url = $"{apiUrl}/api/extensions/Get";
+
+            var requestBody = new ExtensionApiRequest
+            {
+                ApiKey = paramCalendar.ApiKey
+            };
+
+            var json = JsonConvert.SerializeObject(requestBody);
+            using (var requestMessage = new HttpRequestMessage(HttpMethod.Post, url))
+            {
+                requestMessage.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                using (var response = await httpClient.SendAsync(requestMessage))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync();
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        logger.Warn($"Failed to get extensions. StatusCode: {response.StatusCode}");
+                        return new List<ExtensionData>();
+                    }
+
+                    var result = JsonConvert.DeserializeObject<ExtensionGetResponse>(responseBody);
+                    return result?.Response?.Data ?? new List<ExtensionData>();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Extensionを作成または更新する
+        /// </summary>
+        private static async Task CreateOrUpdateExtensionAsync(
+            Parameters.Calendar paramCalendar,
+            string extensionName,
+            string body,
+            List<ExtensionData> existingExtensions)
+        {
+            var existing = existingExtensions
+                .FirstOrDefault(e => e.ExtensionName == extensionName);
+
+            if (existing != null)
+            {
+                await UpdateExtensionAsync(paramCalendar, existing.ExtensionId, extensionName, body);
+            }
+            else
+            {
+                await CreateExtensionAsync(paramCalendar, extensionName, body);
+            }
+        }
+
+        /// <summary>
+        /// Extensions APIで新規Extensionを作成する
+        /// </summary>
+        private static async Task CreateExtensionAsync(
+            Parameters.Calendar paramCalendar,
+            string extensionName,
+            string body)
+        {
+            var apiUrl = paramCalendar.ApiUrl.TrimEnd('/');
+            var url = $"{apiUrl}/api/extensions/Create";
+
+            var requestBody = new ExtensionApiRequest
+            {
+                ApiKey = paramCalendar.ApiKey,
+                ExtensionType = "Style",
+                ExtensionName = extensionName,
+                Body = body,
+                Description = extensionName,
+                Disabled = false
+            };
+
+            var json = JsonConvert.SerializeObject(requestBody);
+            using (var requestMessage = new HttpRequestMessage(HttpMethod.Post, url))
+            {
+                requestMessage.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                using (var response = await httpClient.SendAsync(requestMessage))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        logger.Info($"Extension '{extensionName}' Created.");
+                    }
+                    else
+                    {
+                        logger.Error($"Failed to create extension '{extensionName}'. StatusCode: {response.StatusCode}, Response: {responseBody}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Extensions APIで既存Extensionを更新する
+        /// </summary>
+        private static async Task UpdateExtensionAsync(
+            Parameters.Calendar paramCalendar,
+            int extensionId,
+            string extensionName,
+            string body)
+        {
+            var apiUrl = paramCalendar.ApiUrl.TrimEnd('/');
+            var url = $"{apiUrl}/api/extensions/{extensionId}/Update";
+
+            var requestBody = new ExtensionApiRequest
+            {
+                ApiKey = paramCalendar.ApiKey,
+                ExtensionType = "Style",
+                ExtensionName = extensionName,
+                Body = body,
+                Description = extensionName,
+                Disabled = false
+            };
+
+            var json = JsonConvert.SerializeObject(requestBody);
+            using (var requestMessage = new HttpRequestMessage(HttpMethod.Post, url))
+            {
+                requestMessage.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                using (var response = await httpClient.SendAsync(requestMessage))
+                {
+                    var responseBody = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        logger.Info($"Extension '{extensionName}' Updated.");
+                    }
+                    else
+                    {
+                        logger.Error($"Failed to update extension '{extensionName}'. StatusCode: {response.StatusCode}, Response: {responseBody}");
+                    }
+                }
             }
         }
 
