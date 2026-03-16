@@ -53,7 +53,7 @@ namespace VehicleVision.Pleasanter.CalendarHolidayStyleGenerator
                 }
                 else if (mode == "file")
                 {
-                    //ファイルモードの場合、ペースパスの有無を取得する
+                    //ファイルモードの場合、ベースパスの有無を取得する
                     if (!argsDic.TryGetValue("p", out var rootPath))
                     {
                         rootPath = Path.Combine(currentPath, "..", "Implem.Pleasanter");
