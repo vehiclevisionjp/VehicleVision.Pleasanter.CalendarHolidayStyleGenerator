@@ -120,6 +120,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge main to develop
+        continue-on-error: true
         run: |
           git fetch origin develop
           git checkout develop
