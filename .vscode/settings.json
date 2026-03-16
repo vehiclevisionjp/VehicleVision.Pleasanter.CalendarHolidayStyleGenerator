@@ -18,5 +18,14 @@
     "editor.formatOnSave": true
   },
   "editor.formatOnSave": true,
-  "files.eol": "\n"
+  "files.eol": "\n",
+  // ==================== RunOnSave（TOC自動更新） ====================
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "docs[/\\\\].*\\.md$",
+        "cmd": "node docs/script/toc-single.js \"${file}\""
+      }
+    ]
+  }
 }
