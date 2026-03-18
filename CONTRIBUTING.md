@@ -80,7 +80,15 @@ GitHub上でプルリクエストを作成してください。
 サブモジュールとして参照しています。
 CSS セレクタの検証や Pleasanter のカレンダー HTML 構造の確認に使用します。
 
+サブモジュールの初期化:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## ビルド
+
+サブモジュールの初期化後、以下のコマンドでビルドできます:
 
 ```bash
 dotnet build
